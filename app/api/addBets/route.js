@@ -1,4 +1,4 @@
-import { getPool } from "../../../lib/db";
+import pool from "../../../lib/db";
 
 export async function POST(req) {
   const { searchParams } = new URL(req.url);
