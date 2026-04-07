@@ -6,15 +6,7 @@ const BETTING_SECONDS = 10;
 const ROUND_SECONDS = 15;
 
 function getUserIdFromRequest(req) {
-  let token = req.cookies.get("authToken")?.value;
-
-  if (!token) {
-    const authHeader = req.headers.get("authorization");
-    if (authHeader?.startsWith("Bearer ")) {
-      token = authHeader.substring(7);
-    }
-  }
-
+  const token = req.cookies.get("authToken")?.value;
   if (!token) {
     return null;
   }

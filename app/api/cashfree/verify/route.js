@@ -10,14 +10,7 @@ const getCashfreeBaseUrl = () => {
 };
 
 const getAuthUserId = (request) => {
-  let token = request.cookies.get("authToken")?.value;
-  if (!token) {
-    const authHeader = request.headers.get("authorization");
-    if (authHeader?.startsWith("Bearer ")) {
-      token = authHeader.substring(7);
-    }
-  }
-
+  const token = request.cookies.get("authToken")?.value;
   if (!token) return null;
 
   try {

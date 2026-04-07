@@ -13,14 +13,7 @@ const getAppBaseUrl = () =>
   process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
 const getAuthUserId = (request) => {
-  let token = request.cookies.get("authToken")?.value;
-  if (!token) {
-    const authHeader = request.headers.get("authorization");
-    if (authHeader?.startsWith("Bearer ")) {
-      token = authHeader.substring(7);
-    }
-  }
-
+  const token = request.cookies.get("authToken")?.value;
   if (!token) return null;
 
   try {

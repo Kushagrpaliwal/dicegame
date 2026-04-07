@@ -32,7 +32,9 @@ export default function ProfilePage() {
   useEffect(() => {
     async function fetchProfile() {
       try {
-        const res = await fetch("/api/user-api/profile");
+        const res = await fetch("/api/user-api/profile", {
+          credentials: "include",
+        });
         const data = await res.json();
         if (res.ok) {
           setUserData(data.user);

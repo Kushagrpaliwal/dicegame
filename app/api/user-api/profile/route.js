@@ -4,15 +4,8 @@ import pool from "../../../../lib/db";
 
 export async function GET(req) {
   try {
-    // 1. Token Extraction
-    let token = req.cookies.get('authToken')?.value;
-    if (!token) {
-      const authHeader = req.headers.get("authorization");
-      if (authHeader?.startsWith("Bearer ")) {
-        token = authHeader.substring(7);
-      }
-    }
-
+    // 1. Token Extraction from cookie only
+    const token = req.cookies.get('authToken')?.value;
     if (!token) {
       return NextResponse.json({ error: "No token provided" }, { status: 401 });
     }

@@ -62,7 +62,6 @@ export async function POST(req) {
     const response = NextResponse.json(
       {
         message: "Login successful",
-        token,
         user: {
           id: user.id,
           name: user.name,
@@ -76,10 +75,17 @@ export async function POST(req) {
       { status: 200 }
     );
 
-    // Set token as secure HTTP-only cookie (7 days expiry)
+    const requestUrl = new URL(req.url);
+    const forwardedProto = req.headers.get('x-forwarded-proto');
+    const isSecure =
+      process.env.NODE_ENV === 'production'
+        ? forwardedProto === 'https' || requestUrl.protocol === 'https:'
+        : false;
+
+    // Set token as HTTP-only cookie (secure only when actual HTTPS is used)
     response.cookies.set('authToken', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isSecure,
       sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
       path: '/',

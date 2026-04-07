@@ -21,7 +21,9 @@ export default function TransactionPage() {
       try {
         setLoading(true);
         // Assuming your API route is /api/user/profile
-        const response = await fetch("/api/user-api/profile"); 
+        const response = await fetch("/api/user-api/profile", {
+          credentials: "include",
+        });
         const data = await response.json();
 
         if (response.ok && data.user?.history) {
