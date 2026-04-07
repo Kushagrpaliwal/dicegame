@@ -5,7 +5,7 @@ const protectedRoutes = ['/game', '/game/onedicegame', '/game/twodicegame', '/pr
 const adminRoutes = ['/admin'];
 const publicRoutes = ['/login', '/register', '/'];
 
-export function middleware(request) {
+export function proxy(request) {
   const pathname = request.nextUrl.pathname;
 
   // Check if route is protected
