@@ -25,6 +25,8 @@ export default function TwoDiceGamePage() {
   const requestInFlightRef = useRef(false);
   const countdownSyncRef = useRef({ baseTimeLeft: 0, syncedAt: Date.now() });
   const toastTimerRef = useRef(null);
+  const historyDelayRef = useRef(null);
+  const pendingHistoryRef = useRef([]);
 
   const showToast = useCallback((message, type = "info") => {
     setToast({ message, type });
@@ -68,9 +70,25 @@ export default function TwoDiceGamePage() {
         dice2: Number(latest.dice2 || 1),
         sum: Number(latest.sum || 2),
       });
-      setRoundHistory(
-        Array.isArray(data.roundHistory) ? data.roundHistory : [],
-      );
+      const nextHistory = Array.isArray(data.roundHistory)
+        ? data.roundHistory
+        : [];
+
+      if (nextTimeLeft === 0) {
+        pendingHistoryRef.current = nextHistory;
+        if (!historyDelayRef.current) {
+          historyDelayRef.current = setTimeout(() => {
+            setRoundHistory(pendingHistoryRef.current);
+            historyDelayRef.current = null;
+          }, 3000);
+        }
+      } else {
+        if (historyDelayRef.current) {
+          clearTimeout(historyDelayRef.current);
+          historyDelayRef.current = null;
+        }
+        setRoundHistory(nextHistory);
+      }
       setBalance(Number(data.wallet || 0));
       setCanBet(Boolean(data.canBet));
       setMyCurrentBets(Array.isArray(data.currentBets) ? data.currentBets : []);
@@ -92,6 +110,10 @@ export default function TwoDiceGamePage() {
     return () => {
       if (toastTimerRef.current) {
         clearTimeout(toastTimerRef.current);
+      }
+      if (historyDelayRef.current) {
+        clearTimeout(historyDelayRef.current);
+        historyDelayRef.current = null;
       }
     };
   }, []);
@@ -124,6 +146,9 @@ export default function TwoDiceGamePage() {
   const displayDice = isRolling
     ? rollingFaces
     : [lastResults.dice1 || 1, lastResults.dice2 || 1];
+  const shouldShowRevealMessage = !canBet && timeLeft > 0;
+  const shouldShowResultPopup = !canBet && timeLeft <= 5;
+  const isResultDeclared = timeLeft === 0;
 
   const handleInputChange = (e) => {
     const val = parseInt(e.target.value, 10);
@@ -242,35 +267,75 @@ export default function TwoDiceGamePage() {
           </div>
 
           <div className="dice-stage flex-1 flex items-center justify-center py-8">
-            <div
-              className={`relative transition-all duration-500 ease-out ${
-                isRolling ? "scale-110" : "scale-100"
-              }`}
-            >
-              <div className="absolute -inset-16 md:-inset-20 bg-purple-500/10 blur-[100px] rounded-full"></div>
-              <div className="flex gap-4 md:gap-6">
-                {displayDice.map((face, idx) => (
-                  <div
-                    key={idx}
-                    className={`w-32 h-32 md:w-36 md:h-36 border-4 border-purple-500/30 rounded-[32px] md:rounded-[38px] flex items-center justify-center bg-black/40 backdrop-blur-xl shadow-[0_0_80px_rgba(168,85,247,0.1)] ${
-                      isRolling
-                        ? idx === 0
-                          ? "dice-rolling-left"
-                          : "dice-rolling-right"
-                        : ""
-                    }`}
-                  >
-                    <img
-                      src={`/${face}.png`}
-                      alt={`Dice ${idx + 1} - ${face}`}
-                      className="w-28 h-28 md:w-32 md:h-32 object-contain drop-shadow-[0_0_20px_rgba(192,255,0,0.35)] rounded-[30px] md:rounded-[36px]"
+            <div className="flex flex-col items-center gap-3">
+              <div
+                className={`relative transition-all duration-500 ease-out ${
+                  isRolling ? "scale-110" : "scale-100"
+                }`}
+              >
+                <div className="absolute -inset-16 md:-inset-20 bg-purple-500/10 blur-[100px] rounded-full"></div>
+                <div className="flex gap-4 md:gap-6">
+                  {displayDice.map((face, idx) => (
+                    <div
+                      key={idx}
+                      className={`w-32 h-32 md:w-36 md:h-36 border-4 border-purple-500/30 rounded-[32px] md:rounded-[38px] flex items-center justify-center bg-black/40 backdrop-blur-xl shadow-[0_0_80px_rgba(168,85,247,0.1)] ${
+                        isRolling
+                          ? idx === 0
+                            ? "dice-rolling-left"
+                            : "dice-rolling-right"
+                          : ""
+                      }`}
+                    >
+                      <img
+                        src={`/${face}.png`}
+                        alt={`Dice ${idx + 1} - ${face}`}
+                      className={`w-28 h-28 md:w-32 md:h-32 object-contain drop-shadow-[0_0_20px_rgba(192,255,0,0.35)] rounded-[30px] md:rounded-[36px] transition-all duration-500 ${
+                        shouldShowRevealMessage
+                          ? "blur-[3px] opacity-80"
+                          : "blur-0"
+                      }`}
                       onError={(e) => {
                         e.currentTarget.src = "/two-dice-image.png";
                       }}
                     />
-                  </div>
-                ))}
+                    </div>
+                  ))}
+                </div>
               </div>
+              {shouldShowRevealMessage ? (
+                <div className="text-center px-3">
+                  <div className="text-[10px] md:text-xs font-black uppercase tracking-widest text-white/90 bg-black/60 border border-white/10 rounded-lg px-3 py-2">
+                    Dice will be open after 5sec
+                  </div>
+                </div>
+              ) : null}
+              {shouldShowResultPopup ? (
+                <div className="w-full max-w-[240px] rounded-2xl border border-white/10 bg-black/70 px-3 py-2 text-center shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+                  <div className="flex items-center justify-center gap-2">
+                    <img
+                      src={`/${displayDice[0]}.png`}
+                      alt="Dice preview 1"
+                      className="w-7 h-7 object-contain"
+                      onError={(e) => {
+                        e.currentTarget.src = "/two-dice-image.png";
+                      }}
+                    />
+                    <img
+                      src={`/${displayDice[1]}.png`}
+                      alt="Dice preview 2"
+                      className="w-7 h-7 object-contain"
+                      onError={(e) => {
+                        e.currentTarget.src = "/two-dice-image.png";
+                      }}
+                    />
+                    <span className="text-[11px] font-black uppercase tracking-widest text-[#c0ff00]">
+                      {isResultDeclared
+                        ? `Result ${lastResults.sum}`
+                        : `Result in 0${timeLeft}`}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
 

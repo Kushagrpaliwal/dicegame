@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Trophy, Wallet, User } from 'lucide-react';
+import { Dumbbell, Home, Wallet, User } from 'lucide-react';
 
 export default function BottomNav() {
   const pathname = usePathname();
 
   const navItems = [
     { name: 'Home', icon: Home, path: '/game' },
-    { name: 'Leaderboard', icon: Trophy, path: '/leaderboard' },
+    { name: 'Sports', icon: Dumbbell, path: '/sports' },
     { name: 'Transactions', icon: Wallet, path: '/transactions' },
     { name: 'Profile', icon: User, path: '/profile' },
   ];

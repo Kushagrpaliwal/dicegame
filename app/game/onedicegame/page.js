@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { io } from "socket.io-client";
 import { User, Zap, RotateCcw, History, Plus, Minus } from "lucide-react";
 
 export default function DiceRushResponsive() {
@@ -20,8 +21,10 @@ export default function DiceRushResponsive() {
 
   const requestInFlightRef = useRef(false);
   const countdownSyncRef = useRef({ baseTimeLeft: 0, syncedAt: Date.now() });
-
+  const socketRef = useRef(null);
   const historyDelayRef = useRef(null);
+  const pendingHistoryRef = useRef([]);
+
   const toastTimerRef = useRef(null);
 
   const showToast = useCallback((message, type = "info") => {
@@ -63,20 +66,24 @@ export default function DiceRushResponsive() {
       setIsRolling(Boolean(data.isRolling));
       setLastResult(Number(data.lastResult || 1));
 
-      // 🧠 CLEAR OLD TIMER (important)
-      if (historyDelayRef.current) {
-        clearTimeout(historyDelayRef.current);
-      }
+      const nextHistory = Array.isArray(data.roundHistory)
+        ? data.roundHistory
+        : [];
 
-      // ✅ APPLY DELAY ONLY DURING RESULT PHASE
-      if (!data.canBet) {
-        const delay = nextTimeLeft * 1000; // dynamic delay
-
-        historyDelayRef.current = setTimeout(() => {
-          setRoundHistory(
-            Array.isArray(data.roundHistory) ? data.roundHistory : [],
-          );
-        }, delay);
+      if (nextTimeLeft === 0) {
+        pendingHistoryRef.current = nextHistory;
+        if (!historyDelayRef.current) {
+          historyDelayRef.current = setTimeout(() => {
+            setRoundHistory(pendingHistoryRef.current);
+            historyDelayRef.current = null;
+          }, 3000);
+        }
+      } else {
+        if (historyDelayRef.current) {
+          clearTimeout(historyDelayRef.current);
+          historyDelayRef.current = null;
+        }
+        setRoundHistory(nextHistory);
       }
 
       setBalance(Number(data.wallet || 0));
@@ -92,9 +99,52 @@ export default function DiceRushResponsive() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const initSocket = async () => {
+      try {
+        await fetch("/api/socket", { method: "GET" });
+      } catch (err) {
+        if (isMounted) {
+          setError(err.message || "Unable to reach realtime server");
+        }
+      }
+
+      if (!isMounted) return;
+
+      const socket = io({ path: "/api/socket" });
+      socketRef.current = socket;
+
+      socket.on("connect", () => {
+        fetchGameState();
+      });
+
+      socket.on("dice:state", () => {
+        fetchGameState();
+      });
+
+      socket.on("connect_error", () => {
+        fetchGameState();
+      });
+    };
+
     fetchGameState();
-    const timer = setInterval(fetchGameState, 1000);
-    return () => clearInterval(timer);
+    initSocket();
+
+    const fallbackTimer = setInterval(() => {
+      if (!socketRef.current?.connected) {
+        fetchGameState();
+      }
+    }, 10000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(fallbackTimer);
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
   }, [fetchGameState]);
 
   useEffect(() => {
@@ -104,6 +154,7 @@ export default function DiceRushResponsive() {
       }
       if (historyDelayRef.current) {
         clearTimeout(historyDelayRef.current);
+        historyDelayRef.current = null;
       }
     };
   }, []);
@@ -132,6 +183,11 @@ export default function DiceRushResponsive() {
   }, []);
 
   const displayFace = isRolling ? rollingFace : lastResult;
+  const shouldSlowRoll = timeLeft <= 10 && timeLeft > 0;
+  const shouldShowRevealMessage = !canBet && timeLeft > 0;
+  const shouldFastRoll = isRolling && !shouldSlowRoll && !shouldShowRevealMessage;
+  const shouldShowResultPopup = !canBet && timeLeft <= 5;
+  const isResultDeclared = timeLeft === 0;
 
   const handleInputChange = (e) => {
     const val = parseInt(e.target.value);
@@ -252,24 +308,58 @@ export default function DiceRushResponsive() {
 
           {/* CENTER: THE DICE (UPDATED ANIMATION WRAPPER) */}
           <div className="dice-stage flex-1 flex items-center justify-center py-8">
-            <div
-              className={`relative transition-all duration-500 ease-out ${
-                isRolling
-                  ? "dice-rolling scale-110"
-                  : "rotate-0 scale-100 drop-shadow-[0_0_30px_rgba(192,255,0,0.2)]"
-              }`}
-            >
-              <div className="absolute -inset-16 md:-inset-20 bg-purple-500/10 blur-[100px] rounded-full"></div>
-              <div className="w-36 h-36 md:w-44 md:h-44 border-4 border-purple-500/30 rounded-[32px] md:rounded-[38px] flex items-center justify-center bg-black/40 backdrop-blur-xl shadow-[0_0_80px_rgba(168,85,247,0.1)]">
-                <img
-                  src={`/${displayFace}.png`}
-                  alt={`Dice ${displayFace}`}
-                  className="w-30 h-30 md:w-40 md:h-40 object-contain drop-shadow-[0_0_20px_rgba(192,255,0,0.35)] rounded-[30px] md:rounded-[36px]"
-                  onError={(e) => {
-                    e.currentTarget.src = "/one-dice-image.png";
-                  }}
-                />
+            <div className="flex flex-col items-center gap-3">
+              <div
+                className={`relative transition-all duration-500 ease-out ${
+                  shouldFastRoll
+                    ? "dice-rolling scale-110"
+                    : shouldSlowRoll
+                      ? "dice-rolling-slow scale-105"
+                      : "rotate-0 scale-100 drop-shadow-[0_0_30px_rgba(192,255,0,0.2)]"
+                }`}
+              >
+                <div className="absolute -inset-16 md:-inset-20 bg-purple-500/10 blur-[100px] rounded-full"></div>
+                <div className="w-36 h-36 md:w-44 md:h-44 border-4 border-purple-500/30 rounded-[32px] md:rounded-[38px] flex items-center justify-center bg-black/40 backdrop-blur-xl shadow-[0_0_80px_rgba(168,85,247,0.1)] relative">
+                  <img
+                    src={`/${displayFace}.png`}
+                    alt={`Dice ${displayFace}`}
+                    className={`w-30 h-30 md:w-40 md:h-40 object-contain drop-shadow-[0_0_20px_rgba(192,255,0,0.35)] rounded-[30px] md:rounded-[36px] transition-all duration-500 ${
+                      shouldShowRevealMessage
+                        ? "blur-[3px] opacity-80"
+                        : "blur-0"
+                    }`}
+                    onError={(e) => {
+                      e.currentTarget.src = "/one-dice-image.png";
+                    }}
+                  />
+                </div>
               </div>
+              {shouldShowResultPopup ? (
+                <div className="w-full max-w-[220px] rounded-2xl border border-white/10 bg-black/70 px-3 py-2 text-center shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+                  <div className="flex items-center justify-center gap-2">
+                    <img
+                      src={`/${displayFace}.png`}
+                      alt="Dice preview"
+                      className="w-8 h-8 object-contain"
+                      onError={(e) => {
+                        e.currentTarget.src = "/one-dice-image.png";
+                      }}
+                    />
+                    <span className="text-[11px] font-black uppercase tracking-widest text-[#c0ff00]">
+                      {isResultDeclared
+                        ? `Result ${lastResult}`
+                        : `Result in 0${timeLeft}`}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+              {shouldShowRevealMessage ? (
+                <div className="text-center px-3">
+                  <div className="text-[10px] md:text-xs font-black uppercase tracking-widest text-white/90 bg-black/60 border border-white/10 rounded-lg px-3 py-2">
+                    Dice will be open after 5sec
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -423,6 +513,12 @@ export default function DiceRushResponsive() {
         /* 🔵 CIRCULAR SMOOTH SPIN */
         .dice-rolling {
           animation: dice-spin 0.4s linear infinite;
+          transform-style: preserve-3d;
+          will-change: transform;
+        }
+
+        .dice-rolling-slow {
+          animation: dice-spin 2.8s linear infinite;
           transform-style: preserve-3d;
           will-change: transform;
         }

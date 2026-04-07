@@ -2,82 +2,104 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 
 export default function SplashPage() {
   const router = useRouter();
-  const [progress, setProgress] = useState(0);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    let value = 0;
+    // Wait 3 seconds for the loading effect
+    const timer = setTimeout(() => {
+      setIsLoaded(true);
+      
+      // Navigate after the "Scale Up" animation completes
+      setTimeout(() => {
+        router.push('/login');
+      }, 700); 
+    }, 3000);
 
-    const interval = setInterval(() => {
-      value += Math.random() * 4;
-
-      if (value >= 100) {
-        value = 100;
-        clearInterval(interval);
-
-        setTimeout(() => {
-          router.push('/login');
-        }, 800);
-      }
-
-      setProgress(Math.floor(value));
-    }, 100);
-
-    return () => clearInterval(interval);
+    return () => clearTimeout(timer);
   }, [router]);
 
   return (
-    <div className="fixed inset-0 w-screen h-screen overflow-hidden">
+    <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-black flex flex-col items-center justify-center">
+      
+      {/* BACKGROUND LAYER */}
+      <div className="absolute inset-0 z-0">
+        {/* Mobile Background: Hidden on medium screens and up */}
+        <img
+          src="/casino-mobile-bg.png" 
+          alt="mobile background"
+          className="w-full h-full object-cover block md:hidden opacity-50"
+        />
 
-      {/* MOBILE BACKGROUND */}
-      <img
-        src="/mobile-bg.png"
-        alt="mobile background"
-        className="absolute inset-0 w-full h-full object-cover block md:hidden"
-      />
+        {/* Desktop Background: Hidden on small screens */}
+        <img
+          src="/casino-desktop-bg.png" 
+          alt="desktop background"
+          className="w-full h-full object-cover hidden md:block opacity-40"
+        />
 
-      {/* DESKTOP BACKGROUND */}
-      <img
-        src="/desktop-bg.png"
-        alt="desktop background"
-        className="absolute inset-0 w-full h-full object-cover hidden md:block"
-      />
+        {/* DARK OVERLAY: Creates the high-end Casino depth */}
+        <div className="absolute inset-0 bg-black/60 shadow-[inset_0_0_100px_rgba(0,0,0,0.9)]"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40"></div>
+      </div>
 
-      {/* OVERLAY */}
-      <div className="absolute inset-0 bg-black/30"></div>
-
-      {/* CONTENT */}
-      <div className="relative z-10 flex flex-col items-center justify-between h-full w-full">
-
-        {/* LOGO */}
-        <div className="mt-16 flex justify-center w-full">
+      {/* MAIN CONTENT CONTAINER */}
+      <div className={`relative z-10 flex flex-col items-center transition-all duration-1000 ease-in-out ${
+        isLoaded ? 'opacity-0 scale-110 blur-sm' : 'opacity-100 scale-100'
+      }`}>
+        
+        {/* CENTERED LOGO AREA */}
+        <div className="relative mb-10">
+          {/* Outer Golden Glow */}
+          <div className="absolute inset-0 bg-yellow-600/20 blur-[60px] rounded-full animate-pulse"></div>
+          
           <img
-            src="/logo.png"
-            alt="logo"
-            className="w-52 sm:w-64 md:w-72 lg:w-80"
+            src="/dice_rush_logo.png"
+            alt="Dice Rush Logo"
+            className={`w-40 h-40 md:w-56 md:h-56 object-contain transition-all duration-1000 ${
+              isLoaded ? 'scale-125' : 'animate-bounce'
+            }`}
           />
         </div>
 
-        {/* PROGRESS */}
-        <div className="w-full px-6 md:px-24 lg:px-48 mb-10">
+        {/* BRANDING & LOADER */}
+        <div className="text-center">
+          <h1 className="text-gold-gradient text-3xl md:text-5xl font-serif tracking-[0.2em] uppercase mb-3">
+            Dice Rush
+          </h1>
+          
+          <div className="flex flex-col items-center gap-4">
+            <p className="text-yellow-500/70 text-[10px] md:text-xs tracking-[0.4em] uppercase font-light">
+              {isLoaded ? 'Entering Lobby' : 'Preparing Your Table'}
+            </p>
 
-          <div className="w-full h-5 bg-white/30 rounded-full overflow-hidden shadow-lg">
-            <div
-              className="h-full bg-gradient-to-r from-blue-400 to-cyan-300 transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
+            {/* MINIMALIST GOLD SHIMMER LINE */}
+            {!isLoaded && (
+              <div className="w-32 md:w-48 h-[1px] bg-white/10 overflow-hidden relative">
+                <div className="h-full bg-gradient-to-r from-transparent via-yellow-400 to-transparent w-full animate-shimmer absolute top-0 left-0" />
+              </div>
+            )}
           </div>
-
-          <p className="text-center text-white font-bold mt-4 text-sm sm:text-base md:text-lg">
-            Loading... {progress}%
-          </p>
-
-
         </div>
       </div>
+
+      <style jsx>{`
+        .text-gold-gradient {
+          background: linear-gradient(to bottom, #fff3c2 0%, #e2b04a 45%, #8a5d14 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+        }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        .animate-shimmer {
+          animation: shimmer 2s infinite ease-in-out;
+        }
+      `}</style>
     </div>
   );
 }
